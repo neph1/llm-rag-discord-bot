@@ -63,8 +63,7 @@ class ChromaDb(ExtensionInterface):
             if distance < max_distance:
                 bit = results['documents'][0][i]     
                 # replacing line breaks, since they tend to stop the generation when double
-                trim = bit.replace('\n', '')
-                trimmed_results += f"[SNIPPET]{trim}[/SNIPPET]"
+                trimmed_results += f"[SNIPPET]{bit}[/SNIPPET]\n\n"
                 print(f' {distance} {bit[:15]}')
             else:
                 print(f'not using {distance} {bit[:15]}')
@@ -76,6 +75,4 @@ class ChromaDb(ExtensionInterface):
             result_max_tokens -= response_length
         #print(f'result_max_tokens: {result_max_tokens}')
         trimmed_results = (trimmed_results[:result_max_tokens]) if len(trimmed_results) > result_max_tokens else trimmed_results
-        max_new_prompt = max_context-result_max_tokens
-        newprompt = (newprompt[-(max_new_prompt):]) if len(newprompt) > max_new_prompt else newprompt
         return trimmed_results

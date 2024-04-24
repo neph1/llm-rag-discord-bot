@@ -60,13 +60,24 @@ async def on_message(message: discord.Message):
 
         if openai_backend:
             if rag_results:
-                prompt = f'Use the information in the following snippets to help you. Use only facts found in snippets when responding. If it contains an appropriate link, copy it: {rag_results}. Original prompt: {prompt}'
-            response = openai_backend.query(f'The user {message.author.name} has directed a message to you. Chat history: {history}. Respond appropriately to the message. {prompt}')
+                prompt = f'{rag_results}.\n\nThe user {message.author.name} has directed a message to you. Respond appropriately to the message using the information insinde the [SNIPPET] tags. Use only facts found in snippets when responding. If it contains an appropriate link, copy it\n\n: User message:{prompt}'
+                response = openai_backend.query(prompt)
+            else:
+                response = openai_backend.query(f'The user {message.author.name} has directed a message to you. Chat history: {history}.\n\nRespond appropriately to the message.\n\n{prompt}')
         elif rag_results:
             response = f'I found these pieces of information in the database. I hope they will help! Otherwise, don\'t hesistate to reach out. {rag_results}'
 
         if response:
-            await message.channel.send(response)
+            response_lines = response.split('\n\n')
+            output = ''
+            for line in response_lines:
+                if len(output) + len(line) < 2000:
+                    output += line
+                else:
+                    await message.channel.send(output)
+                    output = line
+            if output:
+                await message.channel.send(output)
         else:
             print('Something went wrong. No response to send')
 

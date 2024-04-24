@@ -13,7 +13,7 @@ class OpenAIBackend:
         self.system_prompt = system_prompt
         
         self.client = openai.OpenAI(
-            base_url="http://localhost:8080/v1", # "http://<Your api-server IP>:port"
+            base_url=self.base_url, # "http://<Your api-server IP>:port"
             api_key = "sk-no-key-required"
         )
 
@@ -21,15 +21,12 @@ class OpenAIBackend:
 
 
     def query(self, prompt: str):
-
-        rag_data = self.rag.inference(prompt, {}, 0)
-
         response = self.client.chat.completions.create(
             model="gpt-3.5-turbo",
-            stop="\n\n\n",
+            stop="\n\n\n\n",
             messages=[
             {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": rag_data}
+            {"role": "user", "content": prompt}
             ]
         )
 
