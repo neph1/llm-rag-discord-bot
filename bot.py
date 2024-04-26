@@ -4,7 +4,9 @@ import discord
 import yaml
 
 from chroma_db.chroma_db import ChromaDb
+from extension import ExtensionInterface
 from openai_backend import OpenAIBackend
+from pull_request.pull_request import PullRequest
 
 with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
@@ -17,17 +19,24 @@ intents = discord.Intents.default()
 
 client = discord.Client(intents=intents)
 
+extensions = list()
+
 openai_backend = None
 if config.get('OPENAI_HOST', None):
     openai_backend = OpenAIBackend(host=config['OPENAI_HOST'], port=config['OPENAI_PORT'], endpoint=config['OPENAI_ENDPOINT'], system_prompt=config['SYSTEM_PROMPT'])
 else:
     print('No openai host. Running without')
 
+github = None
+if config.get('GITHUB', None):
+    github = PullRequest()
+    extensions.append(github)
 chromaDb = None
 if config.get('CHROMA_PATH', None):
     chromaDb = ChromaDb(config['CHROMA_PATH'])
+    extensions.append(chromaDb)
 else:
-    print('No chromadb. Running wihtout')
+    print('No chromadb. Running without')
 
 @client.event
 async def on_ready():
@@ -48,6 +57,19 @@ async def on_member_join(member: discord.Member):
 
 @client.event
 async def on_message(message: discord.Message):
+    """ Reacts to messages in server
+    
+    Loops through extensions (will only successfully call one extension per message)
+        Check if message triggers extension
+        Call extension for a result
+        If LLM is available: Modify prompt to suit llm inference, or
+        Package response to suit user
+
+        If no suitable response and LLM available, send prompt to LLM
+
+        Return response to channel
+    """
+
     if message.author == client.user:
         return
     messages = [message async for message in message.channel.history(limit=config['CHANNEL_HISTORY'])]
@@ -55,17 +77,27 @@ async def on_message(message: discord.Message):
     if client.user in message.mentions or message.channel.type == discord.ChannelType.private:
 
         prompt = message.content
-        if chromaDb:
-            rag_results = chromaDb.inference(message.content)
+        response = None
+        for extension in extensions:
+            if not extension.check_for_trigger(prompt=prompt):
+                continue
+            results = extension.call(prompt=prompt)
+            if not results:
+                continue
 
-        if openai_backend:
-            if rag_results:
-                prompt = f'{rag_results}.\n\nThe user {message.author.name} has directed a message to you. Respond appropriately to the message using the information insinde the [SNIPPET] tags. Use only facts found in snippets when responding. If it contains an appropriate link, copy it\n\n: User message:{prompt}'
-                response = openai_backend.query(prompt)
-            else:
-                response = openai_backend.query(f'The user {message.author.name} has directed a message to you. Chat history: {history}.\n\nRespond appropriately to the message.\n\n{prompt}')
-        elif rag_results:
-            response = f'I found these pieces of information in the database. I hope they will help! Otherwise, don\'t hesistate to reach out. {rag_results}'
+            if openai_backend:
+                prompt = extension.modify_prompt_for_llm(prompt=prompt, results=results, user=message.author.name)
+                response = openai_backend.query(prompt=prompt)
+                continue
+            if response:
+                break
+            response = extension.modify_response_for_user(response, user=message.author.name)
+
+
+        if not response and openai_backend:
+            # Just LLM inference
+            response = openai_backend.query(f'The user {message.author.name} has directed a message to you. Chat history: {history}.\n\nRespond appropriately to the message.\n\n{prompt}')
+        
 
         if response:
             response_lines = response.split('\n\n')

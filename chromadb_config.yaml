@@ -1,0 +1,13 @@
+
+  collection: ""
+  extension: ".md"
+  doc_split1: "##"
+  doc_split2: "###"
+
+  stop_sequence: null
+  response_length: 1000
+  max_distance: 1.5
+  result_context_factor: 0.25
+  num_results: 3
+  max_context: 10000
+
