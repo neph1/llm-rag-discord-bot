@@ -31,12 +31,16 @@ github = None
 if config.get('GITHUB', None):
     github = PullRequest()
     extensions.append(github)
+
 chromaDb = None
-if config.get('CHROMA_PATH', None):
-    chromaDb = ChromaDb(config['CHROMA_PATH'])
+if config.get('CHROMA', None):
+    chromaDb = ChromaDb()
     extensions.append(chromaDb)
 else:
     print('No chromadb. Running without')
+
+
+
 
 @client.event
 async def on_ready():
@@ -69,11 +73,13 @@ async def on_message(message: discord.Message):
 
         Return response to channel
     """
-
+    extension_history = None
     if message.author == client.user:
         return
     messages = [message async for message in message.channel.history(limit=config['CHANNEL_HISTORY'])]
     history = "\n".join([f"{msg.author.name}: {msg.content}" for msg in messages])
+    if extension_history:
+        history = extension_history + "\n" + history
     if client.user in message.mentions or message.channel.type == discord.ChannelType.private:
 
         prompt = message.content
@@ -82,6 +88,7 @@ async def on_message(message: discord.Message):
             if not extension.check_for_trigger(prompt=prompt):
                 continue
             results = extension.call(prompt=prompt)
+            extension_history = results
             if not results:
                 continue
 
@@ -91,12 +98,12 @@ async def on_message(message: discord.Message):
                 continue
             if response:
                 break
-            response = extension.modify_response_for_user(response, user=message.author.name)
+            response = extension.modify_response_for_user(results, user=message.author.name)
 
 
         if not response and openai_backend:
             # Just LLM inference
-            response = openai_backend.query(f'The user {message.author.name} has directed a message to you. Chat history: {history}.\n\nRespond appropriately to the message.\n\n{prompt}')
+            response = openai_backend.query(f'The user {message.author.name} has directed a message to you. History: {history}.\n\nRespond appropriately to the message.\n\n{prompt}')
         
 
         if response:
