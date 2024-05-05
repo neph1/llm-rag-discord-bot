@@ -13,7 +13,7 @@ class OpenAIBackend:
         self.system_prompt = system_prompt
         
         self.client = openai.OpenAI(
-            base_url=self.base_url, # "http://<Your api-server IP>:port"
+            base_url=self.base_url,
             api_key = "sk-no-key-required"
         )
 

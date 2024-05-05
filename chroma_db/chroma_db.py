@@ -87,7 +87,7 @@ class ChromaDb(ExtensionInterface):
         return trimmed_results
 
     def modify_prompt_for_llm(self, prompt: str, results: str, user: str) -> str:
-        return f'{results}.\n\nThe user {user} has directed a message to you. Respond appropriately to the message using the information insinde the [SNIPPET] tags. Use only facts found in snippets when responding. If it contains an appropriate link, copy it\n\n: User message:{prompt}'
+        return f'{results}.\n\nThe user {user} has directed a message to you. Respond appropriately to the message using the information inside the [SNIPPET] tags. Use only facts found in snippets when responding. If it contains an appropriate link, copy it\n\n: User message:{prompt}'
                 
     def modify_response_for_user(self, results: str, user: str) -> str:
-        return f'I found these pieces of information in the database. I hope they will help! Otherwise, don\'t hesistate to reach out. {results}'
+        return f'I found these pieces of information in the database. I hope they will help! Otherwise, don\'t hesitate to reach out. {results}'
