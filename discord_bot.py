@@ -3,9 +3,8 @@
 import discord
 import yaml
 
-from chroma_db.chroma_db import ChromaDb
+from bot_methods import handle_extensions, load_extensions
 from openai_backend import OpenAIBackend
-from pull_request.pull_request import PullRequest
 
 
 class DiscordBot(discord.Client):
@@ -13,22 +12,15 @@ class DiscordBot(discord.Client):
     def __init__(self, intents, config):
         super().__init__(intents=intents)
         
-        extensions = list()
-
+        self.extensions = list()
+        self.history_length = config['CHANNEL_HISTORY']
         self.openai_backend = None
         if config.get('OPENAI_HOST', None):
             self.openai_backend = OpenAIBackend(host=config['OPENAI_HOST'], port=config['OPENAI_PORT'], endpoint=config['OPENAI_ENDPOINT'], system_prompt=config['SYSTEM_PROMPT'])
         else:
             print('No openai host. Running without')
 
-        if config.get('GITHUB', None):
-            extensions.append(PullRequest())
-
-        if config.get('CHROMA', None):
-            extensions.append(ChromaDb())
-        else:
-            print('No chromadb. Running without')
-
+        self.extensions = load_extensions(config)
 
     async def on_ready(self):
         print(f'{self.user} has connected to Discord!')
@@ -59,35 +51,14 @@ class DiscordBot(discord.Client):
         extension_history = None
         if message.author == self.user:
             return
-        messages = [message async for message in message.channel.history(limit=self.config['CHANNEL_HISTORY'])]
+        messages = [message async for message in message.channel.history(limit=self.history_length)]
         history = "\n".join([f"{msg.author.name}: {msg.content}" for msg in messages])
         if extension_history:
             history = extension_history + "\n" + history
         if self.user in message.mentions or message.channel.type == discord.ChannelType.private:
 
             prompt = message.content
-            response = None
-            for extension in self.extensions:
-                if not extension.check_for_trigger(prompt=prompt):
-                    continue
-                results = extension.call(prompt=prompt)
-                extension_history = results
-                if not results:
-                    continue
-
-                if self.openai_backend:
-                    prompt = extension.modify_prompt_for_llm(prompt=prompt, results=results, user=message.author.name)
-                    response = self.openai_backend.query(prompt=prompt)
-                    continue
-                if response:
-                    break
-                response = extension.modify_response_for_user(results, user=message.author.name)
-
-
-            if not response and self.openai_backend:
-                # Just LLM inference
-                response = self.openai_backend.query(f'The user {message.author.name} has directed a message to you. History: {history}.\n\nRespond appropriately to the message.\n\n{prompt}')
-            
+            response = handle_extensions(self.extensions, self.openai_backend, message.author.name, prompt, history)
 
             if response:
                 response_lines = response.split('\n\n')
