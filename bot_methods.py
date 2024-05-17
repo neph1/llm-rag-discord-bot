@@ -19,6 +19,7 @@ def load_extensions(config):
     return extensions
 
 def handle_extensions(extensions, openai_backend, user: str, prompt, history):
+    response = None
     for extension in extensions:
         if not extension.check_for_trigger(prompt=prompt):
             continue
@@ -38,3 +39,4 @@ def handle_extensions(extensions, openai_backend, user: str, prompt, history):
     if not response and openai_backend:
         # Just LLM inference
         response = openai_backend.query(f'The user {user} has directed a message to you. History: {history}.\n\nRespond appropriately to the message.\n\n{prompt}')
+    return response
